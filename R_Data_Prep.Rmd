@@ -1,0 +1,429 @@
+---
+title: "R Data Prep"
+author: "Ryan Geier"
+date: "2023-04-10"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Set wd
+```{r}
+knitr::opts_knit$set(root.dir = normalizePath("C:/Users/USERNAME/FOLDER"))
+```
+
+#Load CSV to a dataframe, "read.table" {utils} R Documentation
+```{r}
+df <- read.csv("C:/Users/USERNAME/FOLDER/FILENAME.csv", stringsAsFactors = FALSE)
+```
+
+#Load Excel to a dataframe, with password included
+```{r}
+library(excel.link)
+df <- xl.read.file("filename.xlsx", password = "password123", write.res.password = "password123")
+
+#OR
+
+library(readxl)
+df <- read_excel("df.xlsx", sheet = "sheetname")
+
+#NOTE: Have to set working directory prior
+```
+
+
+
+#Relocate column within the dataframe
+```{r}
+library(dplyr)
+df <- df %>% relocate(columnname, .before = column2)
+```
+
+#Select columns 46:142 inclusive, drops all other columns. Use "-" before "c" to subtract columns 46:142. 
+```{r}
+df <- df[ , c(46:142)]
+
+#OR 
+
+library(dplyr)
+df2 <- df %>% select(-(column1:column2))
+
+#NOTE: Remove "-" to select columns "column1" to "column2"
+
+#OR
+
+df2 <- subset(df, select = -c(column1, column2, column3))
+
+#OR 
+
+num_cols <- unlist(lapply(df, is.numeric))
+data_num <- df[ , num_cols]
+```
+
+#Remove columns by name
+```{r}
+df <- within(df, rm(column1, column2, column3))
+```
+
+#Complete Cases
+```{r}
+df <-  df[complete.cases(df), ]
+
+#OR
+
+df <- na.omit(df)
+```
+
+#Replace empty cells with NA
+```{r}
+df[df == ""] <- NA
+```
+
+#Impute NA's with FUN=mean (functions are FUN! :) )
+```{r}
+df2 <- df %>% 
+  mutate_if(is.numeric, ~replace_na(.,mean(., na.rm = TRUE)))
+```
+
+#Select subset of rows by single columns value
+```{r}
+df <- df[df$columnname == "VALUE", ]
+
+#OR
+
+df2 <- df[!(df$columnname == "VALUE" | df$column2 == "VALUE2"), ]
+
+#NOTE: Remove "!" to select those values, rather than exclude
+
+#OR
+
+df2 <- df[which(df$columnname == "VALUE"), ]
+
+#OR
+
+df2 <- subset(df, df$columnname == 1)
+```
+
+#Transform a single column's data type
+```{r}
+df$columnname <- as.factor(df$columnname)
+```
+
+#Transform column to date format
+```{r}
+df$DATE<-as.POSIXct(df$DATE, format="%m/%d/%Y")
+```
+
+#Transform multiple column's data type using lapply
+```{r}
+df[] <- lapply(df, as.numeric)
+
+#OR
+
+df[,c(46:135)] <- lapply(df[ , c(46:135)], as.numeric)
+```
+
+#Make NA's 0
+```{r}
+df[is.na(df)] <- 0
+```
+
+#Transform a binary factor column to a 0 or 1
+```{r}
+df$columnname <- 1 * (df$columnname == "some value")
+```
+
+#Drop unused factor levels
+```{r}
+df$columnname <- droplevels(df$columnname)
+```
+
+#Drop factor levels by name
+```{r}
+df <- df[!df$columnname %in% c("0", "1", "2", "3", "C7"), ]
+
+#OR
+
+df <- df[!df$columnname == "NULL", ]
+```
+
+#Recode/Combine factors
+```{r}
+df$columnname <- recode(df$columnname, 'c("0", "2", "3", "4", "5", "6", "NULL") = "0"; c("1") = "1";')
+```
+
+#Cut - Create factor from numerical data
+```{r}
+df$columncut <- cut(df$`columnname`, c(0.00,0.24,0.48,0.72,0.96,inf))
+
+#OR
+
+# create bins of size 1
+df$column.bin <- .bincode(df$column, c(1:9)) 
+```
+
+
+#Create reference level for factors (useful for coefficient interpretation)
+```{r}
+df$columnname <- relevel(df$columnname, ref = "0")
+```
+
+#Combine columns using paste
+```{r}
+df$newcolumn <- paste(df$column1, df$column2, df$column3, df$column4, sep="_")
+
+#Results in "'column1value'_'column2value'_'column3value'_'column4value'"
+```
+
+#Combine columns to create a new column
+```{r}
+df$newcolumn <- with(df, df$column1 + df$column2)
+
+#OR
+
+df$newcolumn <- df[, 89] + df[, 90] + df[, 91]
+```
+
+
+#Combine two data frames
+```{r}
+df <- cbind(df, df2)
+
+#Or specify columns
+
+df <- cbind(df, columnname = df2$columnname)
+
+#NOTE: "columnname =" is a function to rename, else will become column "df2$columnname"
+```
+
+#Combine multiple data
+```{r}
+combine.df <- data.frame(df$column, df2$column2, df3, df4)
+```
+
+
+#Transform column(s) by function - Log+1 in example
+```{r}
+df[ , c(3:4)] <- log(df[ , c(3:4)] + 1)
+```
+
+#T-test
+```{r}
+t.test(x, y)
+
+#OR on entire dataframe
+
+library(reshape2)
+meltdf <- melt(df)
+pairwise.t.test(meltdf$value, meltdf$variable, p.adjust = "none")
+```
+
+
+#Correlation Matrix
+```{r}
+round(cor(df), 4)
+
+#OR
+
+library(tidyverse)
+library(dplyr)
+
+dfcorr <- df %>% 
+  select_if(is.numeric) %>% 
+  cor() %>% 
+  round(digits = 2) %>% 
+  as.data.frame()
+dfcorr
+```
+
+
+#Heatmap using ggplot2
+```{r}
+library(ggplot2)
+heatmap(cor(df), Rowv = NA, Colv = NA)
+
+#OR
+
+library(gplots)
+heatmap.2(cor(df), Rowv = FALSE, Colv = FALSE, dendrogram = "none", 
+          cellnote = round(cor(df),2), 
+          notecol = "black", key = FALSE, trace = 'none', margins = c(2,2))
+
+#OR
+
+library(ggplot2)
+library(reshape) # to generate input for the plot
+cor.mat <- round(cor(df),2) # rounded correlation matrix
+ret <- write.csv(x=cor.mat, file="df.csv")
+melted.cor.mat <- melt(cor.mat)
+ggplot(melted.cor.mat, aes(x = X1, y = X2, fill = value)) + 
+  geom_tile() + 
+  geom_text(aes(x = X1, y = X2, label = value))
+```
+
+#PLot using ggplot2
+```{r}
+library(ggplot2)
+ggplot(data=df, aes(x=column1, y=column2)) + geom_point(size=2)+geom_smooth()
+
+#OR
+
+df$Color <-cut(df$columnname, breaks=c(-Inf, 49.9, Inf), labels=c("black", "green"))
+
+ggplot(data=df) + geom_point(mapping=aes(x=column2, y=columnname), size=5, color=df$Color)
+
+#OR
+
+ggplot(df) + geom_point(aes(x = column1, y = column2)) + 
+  scale_x_log10(breaks = 10^(-2:2),
+                labels = format(10^(-2:2), scientific = FALSE, drop0trailing = TRUE)) +
+  scale_y_log10(breaks = c(5, 10, 20, 40))
+```
+
+#Plot base R
+```{r}
+plot(x, y)
+
+#OR
+
+hist(x)
+
+#OR
+
+barplot(x, y)
+
+#OR
+
+boxplot(df$column1 ~ df$column2, xlab = "Column1", ylab = "Column2")
+
+#OR
+
+par(mar=c(5.1, 5.1, 4.1, 2.1))
+par(xpd=TRUE)
+plot(df$column1 ~ df$column2, xlab = "Column 1", ylab = "Column 2")
+legend("topleft", inset=c(0, -0.2),
+legend = c("Column 1", "Column 2 (in thousands of USD)"),
+pch = 1, cex = 0.5)
+
+#OR
+
+data.for.plot <- aggregate(df$Retail.Price, by = list(df$Store.Postcode), FUN = mean)
+names(data.for.plot) <- c("Column 1", "Column 2")
+barplot(data.for.plot$column2, names.arg = data.for.plot$column1,
+xlab = "Column 1", ylab = "Column 2")
+
+#OR
+
+# to use logarithmic scale set argument log = to either 'x', 'y', or 'xy'. 
+plot(df$columnname ~ df$column2, 
+     xlab = "column2", ylab = "columnname", log = 'xy')
+
+#OR
+
+boxplot(df$columnname ~ df$column2, 
+        xlab = "column2", ylab = "columnname", log = 'y')
+```
+
+#Plot with Map - Google API
+```{r}
+library(ggmap)
+seattle <- read.csv("C:/Users/USERNAME/FOLDER/filename.csv")
+head(seattle)
+#you will need to create a google account to get a GoodgleAPI key
+register_google(key = "LongAlphaNumericKeyHere12345")
+
+Map <- get_map("Seattle, WA", zoom = 11)
+ggmap(Map) + geom_point(aes(x = Longitude, y = Latitude), data = seattle,
+                        alpha = 0.4, colour = "red", size = 0.5)
+
+```
+
+
+
+#Aggregate by function (change FUN = mean to other function if necessary)
+```{r}
+aggregation <-aggregate(aggregatedvalue ~ aggregatedby, df, mean)
+
+#View Aggregation
+
+aggregation[with(aggregation, order(aggregatedvalue)),]
+
+#OR
+
+aggregation <- aggregate(df, by=list(cluster=df$columnname), mean)
+```
+
+#Table 
+```{r}
+table(var1, var2)
+
+#OR
+
+prop.tbl <- prop.table(table, margin=2)
+
+#OR
+
+#PIVOT TABLE EXAMPLE
+
+library(reshape) 
+# create bins of size 1
+df$column.bin <- .bincode(df$column, c(1:9)) 
+
+# use melt() to stack a set of columns into a single column of data.
+# stack MEDV values for each combination of (binned) RM and CHAS
+mlt <- melt(df, id=c("column.bin", "column2"), measure=c("column3"))
+
+# use cast() to reshape data and generate pivot table
+cast(mlt, column.bin ~ column2, subset=variable=="column3", 
+     margins=c("grand_row", "grand_col"), mean)
+```
+
+#Univariate and Bivariate Loop print
+```{r plots, echo=FALSE}
+for (i in colnames(df %>% select (c(105:138)))) {
+  a <- df[, i]
+  b <- (class(a))
+  c <- hist(a, xlab = i)
+  cat(" \n")
+  print(i)
+  print("Univariate Summary")
+  print(paste("data type:", b))
+  print(summary(as.numeric(a)))
+  print(c)
+  cat(" \n")
+  cat(" \n")
+  cat(" \n")
+  print("Bivariate Analysis")
+  print(ggplot(df, aes_string(x = i, y = df$columnname)) + geom_point() + geom_smooth() + labs(y= "label_column_name"))  
+  print(ols_regress(paste("columnname ~", i), data = df))
+  print(summary(lm(paste("columnname ~", i), data = df)))
+  cat(" \n")
+  cat(" \n")
+  cat(" \n")
+  }
+```
+
+#Create Matrix, Sparse Matrix, from dataframe
+```{r}
+mx <- data.matrix(df)
+mx <- Matrix(mx, sparse=TRUE)
+```
+
+#Sparse Matrix - Partitioned
+```{r}
+train.sparse <- sparse.model.matrix(~., train.df[1:90])
+test.sparse <- sparse.model.matrix(~., valid.df[1:90])
+```
+
+#Partition Test and Train Data
+```{r}
+set.seed(2)
+train.index <- sample(c(1:dim(df)[1]), dim(df)[1]*0.7)
+train.df <- df[train.index, ]
+valid.df <- df[-train.index, ]
+```
+
+
+
+
