@@ -66,13 +66,26 @@ data_num <- df[ , num_cols]
 df <- within(df, rm(column1, column2, column3))
 ```
 
-#Complete Cases
+#Complete Cases (remove NA's)
 ```{r}
 df <-  df[complete.cases(df), ]
 
 #OR
 
 df <- na.omit(df)
+```
+
+#Complete Cases (remove NA's) by single column
+```{r}
+df <- df[!is.na(df$col_name), ]
+
+#OR
+subset(df, !is.na(col_name))
+
+#OR
+
+library(tidyr)
+df %>% drop_na(col_name)
 ```
 
 #Replace empty cells with NA
